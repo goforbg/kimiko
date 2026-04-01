@@ -745,8 +745,25 @@ let selectedColumn = null;
 let rawRows = [];
 let currentResults = [];
 let abortBulk = false;
+let bulkInProgress = false;
+let bulkResults = [];
+let bulkTotal = 0;
 
 const STORAGE_KEY = 'ip_verifier_jobs';
+
+// Worker pool — main server + 3 dedicated workers (proxied via Caddy for HTTPS)
+const POOL = [
+  '/v0/check_email',
+  '/w2/v0/check_email',
+  '/w3/v0/check_email',
+  '/w4/v0/check_email',
+];
+let poolIdx = 0;
+function nextEndpoint() {
+  const url = POOL[poolIdx % POOL.length];
+  poolIdx++;
+  return url;
+}
 
 // ── DOM ──
 const dropZone = document.getElementById('drop-zone');
@@ -887,6 +904,14 @@ function setEmails(emails) {
 }
 
 function resetUpload() {
+  if (bulkInProgress && bulkResults.length) {
+    abortBulk = true;
+    bulkInProgress = false;
+    savePartialResults();
+  } else {
+    abortBulk = true;
+    bulkInProgress = false;
+  }
   parsedEmails = [];
   rawRows = [];
   columnHeaders = [];
@@ -895,7 +920,6 @@ function resetUpload() {
   previewSection.style.display = 'none';
   progressSection.style.display = 'none';
   resultsSection.style.display = 'none';
-  abortBulk = true;
 }
 
 // ── Bulk verify ──
@@ -904,41 +928,97 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   if (parsedEmails.length > 10000) return showToast('Max 10,000 per job');
   const concurrency = parseInt(slider.value);
   abortBulk = false;
+  bulkInProgress = true;
+  partialSaved = false;
   previewSection.style.display = 'none';
   progressSection.style.display = 'block';
   const total = parsedEmails.length;
-  const results = [];
+  bulkTotal = total;
+  bulkResults = [];
   let done = 0;
   setProgress(0, '0 / ' + total);
   const queue = [...parsedEmails];
 
+  async function checkEmail(email) {
+    // Try up to 2 different endpoints
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const endpoint = nextEndpoint();
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to_email: email }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (res.ok) return await res.json();
+      } catch { /* try next endpoint */ }
+    }
+    return { input: email, is_reachable: 'unknown' };
+  }
+
   async function worker() {
     while (queue.length && !abortBulk) {
       const email = queue.shift();
-      try {
-        const res = await fetch('/v0/check_email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ to_email: email })
-        });
-        if (res.ok) results.push(await res.json());
-        else results.push({ input: email, is_reachable: 'unknown' });
-      } catch { results.push({ input: email, is_reachable: 'unknown' }); }
+      const result = await checkEmail(email);
+      bulkResults.push(result);
       done++;
       setProgress(Math.round((done / total) * 100), done + ' / ' + total);
+      // Auto-checkpoint every 50 results to localStorage (survives crashes)
+      if (done % 50 === 0 && bulkInProgress) {
+        localStorage.setItem('ip_verifier_checkpoint', JSON.stringify({
+          fileName: currentFileName,
+          total: bulkTotal,
+          results: bulkResults,
+          date: new Date().toISOString()
+        }));
+      }
     }
   }
 
   try {
     await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
-    if (!abortBulk) {
+    if (bulkInProgress) {
+      bulkInProgress = false;
+      localStorage.removeItem('ip_verifier_checkpoint');
       setProgress(100, 'Complete');
-      setTimeout(() => showResults(results, 'local-' + Date.now()), 400);
+      setTimeout(() => showResults(bulkResults, 'local-' + Date.now()), 400);
     }
+    // If bulkInProgress was already false, resetUpload handled saving
   } catch (err) {
+    if (bulkInProgress && bulkResults.length) {
+      bulkInProgress = false;
+      savePartialResults();
+    } else {
+      bulkInProgress = false;
+    }
     showToast('Failed: ' + err.message);
     resetUpload();
   }
+});
+
+let partialSaved = false;
+
+function savePartialResults() {
+  if (!bulkResults.length || partialSaved) return;
+  partialSaved = true;
+  const jobId = 'partial-' + Date.now();
+  saveJob({
+    id: jobId,
+    fileName: currentFileName + ' (partial — ' + bulkResults.length + '/' + bulkTotal + ')',
+    date: new Date().toISOString(),
+    total: bulkResults.length,
+    safe: bulkResults.filter(r => classify(r) === 'safe').length,
+    results: bulkResults
+  });
+  renderHistory();
+  showToast('Saved ' + bulkResults.length + '/' + bulkTotal + ' partial results');
+}
+
+window.addEventListener('beforeunload', () => {
+  if (bulkInProgress && bulkResults.length && !partialSaved) savePartialResults();
 });
 
 function setProgress(pct, status) {
@@ -948,7 +1028,7 @@ function setProgress(pct, status) {
 }
 
 // ── Results ──
-function showResults(results, jobId) {
+function showResultsOnly(results) {
   currentResults = results;
   const counts = { safe: 0, risky: 0, invalid: 0, unknown: 0 };
   const tbody = document.getElementById('results-tbody');
@@ -967,9 +1047,15 @@ function showResults(results, jobId) {
   document.getElementById('stat-invalid').textContent = counts.invalid;
   document.getElementById('stat-unknown').textContent = counts.unknown;
 
+  dropZone.style.display = 'none';
+  previewSection.style.display = 'none';
   progressSection.style.display = 'none';
   resultsSection.style.display = 'block';
+  return counts;
+}
 
+function showResults(results, jobId) {
+  const counts = showResultsOnly(results);
   saveJob({ id: jobId, fileName: currentFileName, date: new Date().toISOString(), total: results.length, safe: counts.safe, results });
   renderHistory();
 }
@@ -1025,7 +1111,7 @@ function renderHistory() {
     el.className = 'h-item';
     el.innerHTML = '<div class="h-info"><div class="h-name">' + escHtml(job.fileName) + '</div><div class="h-meta">' + ds + ' · ' + job.total.toLocaleString() + ' emails</div></div><span class="h-safe">' + job.safe + ' safe</span><button class="h-del" title="Remove">&times;</button>';
     el.querySelector('.h-del').addEventListener('click', e => { e.stopPropagation(); deleteJob(job.id); });
-    el.addEventListener('click', () => { currentResults = job.results || []; currentFileName = job.fileName; showResults(job.results, job.id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    el.addEventListener('click', () => { currentResults = job.results || []; currentFileName = job.fileName; showResultsOnly(job.results); window.scrollTo({ top: 0, behavior: 'smooth' }); });
     list.appendChild(el);
   });
 }
@@ -1046,6 +1132,26 @@ function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').repl
 function escCsv(s) { return s.includes(',') ? '"' + s.replace(/"/g, '""') + '"' : s; }
 
 // ── Init ──
+// Recover from crash — check for unsaved checkpoint
+(function recoverCheckpoint() {
+  const raw = localStorage.getItem('ip_verifier_checkpoint');
+  if (!raw) return;
+  try {
+    const cp = JSON.parse(raw);
+    if (cp.results && cp.results.length) {
+      saveJob({
+        id: 'recovered-' + Date.now(),
+        fileName: cp.fileName + ' (recovered — ' + cp.results.length + '/' + cp.total + ')',
+        date: cp.date,
+        total: cp.results.length,
+        safe: cp.results.filter(r => classify(r) === 'safe').length,
+        results: cp.results
+      });
+      showToast('Recovered ' + cp.results.length + ' results from interrupted job');
+    }
+  } catch {}
+  localStorage.removeItem('ip_verifier_checkpoint');
+})();
 renderHistory();
 </script>
 </body>
