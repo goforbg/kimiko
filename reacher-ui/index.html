@@ -710,78 +710,69 @@
     previewSection.style.display = 'none';
     progressSection.style.display = 'none';
     resultsSection.style.display = 'none';
-    if (pollTimer) clearInterval(pollTimer);
+    abortBulk = true;
   }
 
-  // ── Submit job ─────────────────────────────────────────────────────────────
+  // ── Submit job (uses /v0/check_email with concurrency pool) ──────────────
+  let abortBulk = false;
+
   document.getElementById('submit-btn').addEventListener('click', async () => {
     if (!parsedEmails.length) return showToast('No emails to verify');
     if (parsedEmails.length > 10000) return showToast('Max 10,000 emails per job');
 
     const concurrency = parseInt(concurrencySlider.value);
+    abortBulk = false;
 
     previewSection.style.display = 'none';
     progressSection.style.display = 'block';
-    setProgress(0, `Submitting ${parsedEmails.length} emails…`);
+
+    const total = parsedEmails.length;
+    const results = [];
+    let done = 0;
+
+    setProgress(0, `0 / ${total} verified…`);
+
+    // Concurrency pool — run N checks at a time
+    const queue = [...parsedEmails];
+
+    async function worker() {
+      while (queue.length && !abortBulk) {
+        const email = queue.shift();
+        try {
+          const res = await fetch('/v0/check_email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to_email: email })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            results.push(data);
+          } else {
+            results.push({ input: email, is_reachable: 'unknown' });
+          }
+        } catch {
+          results.push({ input: email, is_reachable: 'unknown' });
+        }
+        done++;
+        const pct = Math.round((done / total) * 100);
+        setProgress(pct, `${done} / ${total} verified…`);
+      }
+    }
 
     try {
-      const res = await fetch('/v0/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          input_type: 'array',
-          input: parsedEmails,
-          proxy: { use_headless_firefox: false, lagoon_host: null },
-          smtp_timeout: 60,
-          yahoo_use_api: false,
-          gmail_use_api: false,
-          retries: 1,
-          concurrency
-        })
-      });
+      const workers = Array.from({ length: Math.min(concurrency, total) }, () => worker());
+      await Promise.all(workers);
 
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const data = await res.json();
-      currentJobId = data.job_id;
-      setProgress(2, `Job ${currentJobId} started…`);
-      startPolling(currentJobId);
+      if (!abortBulk) {
+        setProgress(100, 'Done!');
+        const jobId = 'local-' + Date.now();
+        setTimeout(() => showResults(results, jobId), 400);
+      }
     } catch (err) {
-      showToast('Failed to start job: ' + err.message);
+      showToast('Bulk verify failed: ' + err.message);
       resetUpload();
     }
   });
-
-  // ── Polling ────────────────────────────────────────────────────────────────
-  function startPolling(jobId) {
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(() => pollJob(jobId), 2500);
-    pollJob(jobId);
-  }
-
-  async function pollJob(jobId) {
-    try {
-      const res = await fetch(`/v0/bulk/${jobId}`);
-      if (!res.ok) throw new Error(`Poll error: ${res.status}`);
-      const data = await res.json();
-
-      const total = data.total_records || parsedEmails.length;
-      const done = (data.total_processed || 0);
-      const pct = total ? Math.round((done / total) * 100) : 0;
-      setProgress(pct, `${done} / ${total} verified…`);
-
-      if (data.job_status === 'Completed') {
-        clearInterval(pollTimer);
-        setProgress(100, 'Done!');
-        setTimeout(() => showResults(data.results || [], jobId), 400);
-      } else if (data.job_status === 'Failed') {
-        clearInterval(pollTimer);
-        showToast('Job failed. Try again.');
-        resetUpload();
-      }
-    } catch (err) {
-      // silently retry
-    }
-  }
 
   function setProgress(pct, status) {
     progressFill.style.width = pct + '%';
