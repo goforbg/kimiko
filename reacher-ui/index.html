@@ -1,964 +1,1052 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InboxPirates — Email Verifier</title>
-  <style>
-    :root {
-      --accent: #ff3515;
-      --accent-dim: rgba(255, 53, 21, 0.12);
-      --bg: #0a0a0a;
-      --surface: #141414;
-      --surface2: #1e1e1e;
-      --border: #2a2a2a;
-      --text: #f0f0f0;
-      --text-muted: #666;
-      --safe: #22c55e;
-      --risky: #f59e0b;
-      --invalid: #ef4444;
-      --unknown: #6b7280;
-      --radius: 12px;
-      --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InboxPirates — Email Verifier</title>
+<style>
+  :root {
+    --accent: #ff3515;
+    --accent-glow: rgba(255, 53, 21, 0.18);
+    --accent-soft: rgba(255, 53, 21, 0.08);
+    --bg: #000000;
+    --surface: rgba(255,255,255,0.04);
+    --surface-hover: rgba(255,255,255,0.06);
+    --surface-solid: #111111;
+    --glass: rgba(28,28,30,0.72);
+    --glass-border: rgba(255,255,255,0.08);
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.12);
+    --text: #f5f5f7;
+    --text-secondary: rgba(255,255,255,0.55);
+    --text-tertiary: rgba(255,255,255,0.35);
+    --safe: #30d158;
+    --risky: #ffd60a;
+    --invalid: #ff453a;
+    --unknown: #98989d;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+  }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *::selection { background: var(--accent); color: #fff; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 48px 16px 80px;
-    }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
 
-    /* ── Header ── */
-    header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    header .logo {
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 12px;
-    }
-    header h1 {
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      color: var(--text);
-    }
-    header p {
-      margin-top: 8px;
-      font-size: 15px;
-      color: var(--text-muted);
-    }
+  .page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 72px 24px 120px;
+  }
 
-    /* ── Card ── */
-    .card {
-      width: 100%;
-      max-width: 660px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 32px;
-      margin-bottom: 24px;
-    }
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent), 0 0 4px var(--accent);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .hero h1 {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -1.2px;
+    line-height: 1.1;
+    background: linear-gradient(to bottom, #ffffff, rgba(255,255,255,0.72));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 14px;
+  }
+  .hero p {
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    max-width: 400px;
+    margin: 0 auto;
+  }
 
-    /* ── Drop Zone ── */
-    #drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: 10px;
-      padding: 56px 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      position: relative;
-    }
-    #drop-zone.drag-over {
-      border-color: var(--accent);
-      background: var(--accent-dim);
-    }
-    #drop-zone .icon {
-      font-size: 40px;
-      margin-bottom: 12px;
-      display: block;
-    }
-    #drop-zone h2 {
-      font-size: 17px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    #drop-zone p {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-    #file-input { display: none; }
-    #browse-btn {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 8px 18px;
-      background: var(--accent);
-      color: #fff;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: opacity 0.15s;
-    }
-    #browse-btn:hover { opacity: 0.85; }
+  /* ── Single check ── */
+  .single-check {
+    position: relative;
+    margin-bottom: 48px;
+  }
+  .input-wrap {
+    display: flex;
+    gap: 0;
+    background: var(--surface-solid);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .input-wrap:focus-within {
+    border-color: rgba(255, 53, 21, 0.4);
+    box-shadow: 0 0 0 3px var(--accent-glow), 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .input-wrap input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 18px 22px;
+    font-size: 16px;
+    color: var(--text);
+    font-family: inherit;
+    outline: none;
+    min-width: 0;
+  }
+  .input-wrap input::placeholder { color: var(--text-tertiary); }
+  .input-wrap button {
+    padding: 18px 28px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .input-wrap button:hover { opacity: 0.88; }
+  .input-wrap button:disabled { opacity: 0.35; cursor: default; }
+  .single-result {
+    margin-top: 16px;
+    display: none;
+    animation: fadeUp 0.3s ease;
+  }
+  .result-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .result-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .result-email {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-family: "SF Mono", SFMono-Regular, Menlo, monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .result-status {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+  }
 
-    /* ── Column confirm modal ── */
-    #column-modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-    }
-    #column-modal.open { display: flex; }
-    .modal-box {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px 28px 24px;
-      width: 100%;
-      max-width: 420px;
-    }
-    .modal-box h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
-    .modal-box p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
-    .modal-box select {
-      width: 100%;
-      padding: 10px 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 14px;
-      margin-bottom: 20px;
-      appearance: none;
-    }
-    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-    .btn {
-      padding: 9px 18px;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-    /* ── Preview ── */
-    #preview-section { display: none; }
-    .preview-meta {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    .preview-meta .file-icon { font-size: 24px; }
-    .preview-meta .file-info { flex: 1; }
-    .preview-meta .file-info .fname { font-size: 14px; font-weight: 600; }
-    .preview-meta .file-info .fcount { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-    .preview-meta .clear-btn {
-      background: none; border: none; color: var(--text-muted);
-      cursor: pointer; font-size: 20px; line-height: 1; padding: 4px;
-    }
-    .preview-meta .clear-btn:hover { color: var(--text); }
+  /* ── Divider ── */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+  }
+  .section-divider span {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+  }
 
-    /* Concurrency slider */
-    .slider-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-    .slider-row label { white-space: nowrap; }
-    .slider-row input[type=range] {
-      flex: 1;
-      accent-color: var(--accent);
-    }
-    .slider-row .val { min-width: 28px; text-align: right; color: var(--text); font-weight: 600; }
+  /* ── Glass card ── */
+  .glass-card {
+    background: var(--glass);
+    backdrop-filter: blur(40px) saturate(1.5);
+    -webkit-backdrop-filter: blur(40px) saturate(1.5);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 36px;
+    margin-bottom: 32px;
+  }
 
-    /* Submit */
-    #submit-btn {
-      width: 100%;
-      padding: 13px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    #submit-btn:hover { opacity: 0.88; }
-    #submit-btn:disabled { opacity: 0.4; cursor: default; }
+  /* ── Drop zone ── */
+  .drop-zone {
+    border: 1.5px dashed rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 52px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  .drop-zone:hover {
+    border-color: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.02);
+  }
+  .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 40px var(--accent-glow);
+  }
+  .drop-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+  .drop-zone h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .drop-zone p {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-bottom: 18px;
+  }
+  .browse-btn {
+    display: inline-block;
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 980px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .browse-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.18); }
+  #file-input { display: none; }
 
-    /* ── Progress ── */
-    #progress-section { display: none; }
-    .progress-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-    .progress-bar-track {
-      background: var(--surface2);
-      border-radius: 99px;
-      height: 8px;
-      overflow: hidden;
-      margin-bottom: 8px;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 99px;
-      transition: width 0.4s ease;
-      width: 0%;
-    }
-    .progress-status { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+  /* ── Preview ── */
+  #preview-section { display: none; animation: fadeUp 0.3s ease; }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }
+  .file-row .f-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .file-row .f-info { flex: 1; min-width: 0; }
+  .file-row .f-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-row .f-count { font-size: 12px; color: var(--text-tertiary); margin-top: 1px; }
+  .file-row .f-clear {
+    background: none; border: none; color: var(--text-tertiary);
+    cursor: pointer; font-size: 18px; padding: 4px; line-height: 1;
+    transition: color 0.15s;
+  }
+  .file-row .f-clear:hover { color: var(--text); }
 
-    /* ── Results ── */
-    #results-section { display: none; }
-    .results-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .results-header h3 { font-size: 16px; font-weight: 600; }
-    #download-btn {
-      padding: 8px 16px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    #download-btn:hover { opacity: 0.88; }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .slider-row label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .slider-row input[type=range] {
+    flex: 1;
+    accent-color: var(--accent);
+    height: 4px;
+  }
+  .slider-row .val {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    min-width: 20px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
 
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .stat-box {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-    }
-    .stat-box .num { font-size: 22px; font-weight: 700; }
-    .stat-box .lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
-    .stat-box.safe .num { color: var(--safe); }
-    .stat-box.risky .num { color: var(--risky); }
-    .stat-box.invalid .num { color: var(--invalid); }
-    .stat-box.unknown .num { color: var(--unknown); }
+  .primary-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .primary-btn:hover { box-shadow: 0 4px 24px rgba(255, 53, 21, 0.3); }
+  .primary-btn:active { transform: scale(0.985); }
+  .primary-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; transform: none; }
 
-    .results-table-wrap {
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      max-height: 360px;
-      overflow-y: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    thead { position: sticky; top: 0; background: var(--surface2); z-index: 1; }
-    th {
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      font-weight: 600;
-      border-bottom: 1px solid var(--border);
-    }
-    td {
-      padding: 9px 14px;
-      border-bottom: 1px solid var(--border);
-    }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: var(--surface2); }
+  /* ── Progress ── */
+  #progress-section { display: none; animation: fadeUp 0.3s ease; }
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .progress-header span:first-child { font-size: 13px; color: var(--text-secondary); }
+  .progress-header .pct { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+  .track {
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #ff6b4a);
+    border-radius: 99px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 0%;
+    box-shadow: 0 0 16px rgba(255, 53, 21, 0.4);
+  }
+  .progress-sub { font-size: 12px; color: var(--text-tertiary); text-align: center; }
 
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 99px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: capitalize;
-    }
-    .badge.safe { background: rgba(34,197,94,0.15); color: var(--safe); }
-    .badge.risky { background: rgba(245,158,11,0.15); color: var(--risky); }
-    .badge.invalid { background: rgba(239,68,68,0.15); color: var(--invalid); }
-    .badge.unknown { background: rgba(107,114,128,0.15); color: var(--unknown); }
+  /* ── Results ── */
+  #results-section { display: none; animation: fadeUp 0.3s ease; }
+  .results-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .results-bar h3 { font-size: 18px; font-weight: 600; }
+  .dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 980px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .dl-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.16); }
+  .dl-btn svg { width: 14px; height: 14px; }
 
-    /* ── Job History ── */
-    #history-section { width: 100%; max-width: 660px; }
-    #history-section h3 {
-      font-size: 13px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-    }
-    .history-list { display: flex; flex-direction: column; gap: 8px; }
-    .history-item {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      cursor: pointer;
-      transition: border-color 0.15s;
-    }
-    .history-item:hover { border-color: var(--accent); }
-    .history-item .hi-info { flex: 1; }
-    .history-item .hi-name { font-size: 14px; font-weight: 600; }
-    .history-item .hi-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-    .history-item .hi-badge {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--safe);
-      background: rgba(34,197,94,0.1);
-      padding: 3px 10px;
-      border-radius: 99px;
-    }
-    .history-item .hi-del {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 16px;
-      padding: 2px 4px;
-    }
-    .history-item .hi-del:hover { color: var(--invalid); }
-    .empty-history { font-size: 13px; color: var(--text-muted); padding: 16px 0; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    text-align: center;
+    padding: 16px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: border-color 0.15s;
+  }
+  .stat:hover { border-color: var(--border-hover); }
+  .stat .n {
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+  }
+  .stat .l {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+  }
+  .stat.s .n { color: var(--safe); }
+  .stat.r .n { color: var(--risky); }
+  .stat.i .n { color: var(--invalid); }
+  .stat.u .n { color: var(--unknown); }
 
-    /* ── Toast ── */
-    #toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 13px;
-      font-weight: 500;
-      transition: transform 0.3s ease;
-      z-index: 200;
-      white-space: nowrap;
-    }
-    #toast.show { transform: translateX(-50%) translateY(0); }
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .table-scroll {
+    max-height: 380px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { position: sticky; top: 0; z-index: 2; }
+  thead tr { background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); }
+  th {
+    padding: 11px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+  td { padding: 10px 16px; border-top: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td:first-child {
+    font-family: "SF Mono", SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
 
-    /* ── Single verify ── */
-    .single-verify {
-      width: 100%;
-      max-width: 660px;
-      margin-bottom: 24px;
-    }
-    .single-verify .input-row {
-      display: flex;
-      gap: 10px;
-    }
-    .single-verify input {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 18px;
-      font-size: 15px;
-      color: var(--text);
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .single-verify input:focus { border-color: var(--accent); }
-    .single-verify input::placeholder { color: var(--text-muted); }
-    .single-verify button {
-      padding: 14px 22px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: opacity 0.15s;
-    }
-    .single-verify button:hover { opacity: 0.88; }
-    .single-verify button:disabled { opacity: 0.4; cursor: default; }
-    .single-result {
-      margin-top: 14px;
-      padding: 14px 18px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 14px;
-      display: none;
-    }
-    .divider {
-      width: 100%;
-      max-width: 660px;
-      text-align: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 24px;
-      position: relative;
-    }
-    .divider::before, .divider::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      width: calc(50% - 24px);
-      height: 1px;
-      background: var(--border);
-    }
-    .divider::before { left: 0; }
-    .divider::after { right: 0; }
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 980px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .pill.safe { background: rgba(48,209,88,0.12); color: var(--safe); }
+  .pill.risky { background: rgba(255,214,10,0.12); color: var(--risky); }
+  .pill.invalid { background: rgba(255,69,58,0.12); color: var(--invalid); }
+  .pill.unknown { background: rgba(152,152,157,0.12); color: var(--unknown); }
 
-    @media (max-width: 480px) {
-      .stats-row { grid-template-columns: repeat(2, 1fr); }
-      .card { padding: 20px; }
-    }
-  </style>
+  .new-job-btn {
+    width: 100%;
+    padding: 13px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .new-job-btn:hover { background: var(--surface); border-color: var(--border-hover); color: var(--text); }
+
+  /* ── History ── */
+  #history-section { margin-top: 48px; }
+  .history-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 14px;
+  }
+  .h-list { display: flex; flex-direction: column; gap: 8px; }
+  .h-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .h-item:hover { background: var(--surface-hover); border-color: var(--border-hover); }
+  .h-item .h-info { flex: 1; min-width: 0; }
+  .h-item .h-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .h-item .h-meta { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+  .h-item .h-safe {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--safe);
+    background: rgba(48,209,88,0.1);
+    padding: 3px 10px;
+    border-radius: 980px;
+    flex-shrink: 0;
+  }
+  .h-item .h-del {
+    background: none; border: none;
+    color: var(--text-tertiary);
+    cursor: pointer; font-size: 14px;
+    padding: 4px;
+    opacity: 0;
+    transition: all 0.15s;
+  }
+  .h-item:hover .h-del { opacity: 1; }
+  .h-item .h-del:hover { color: var(--invalid); }
+  .h-empty { font-size: 13px; color: var(--text-tertiary); padding: 20px 0; text-align: center; }
+
+  /* ── Column modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #1c1c1e;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px;
+    padding: 28px;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 16px;
+    animation: fadeUp 0.25s ease;
+  }
+  .modal h3 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; line-height: 1.5; }
+  .modal select {
+    width: 100%;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 20px;
+    outline: none;
+    appearance: none;
+  }
+  .modal select:focus { border-color: rgba(255, 53, 21, 0.4); }
+  .modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btns button {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s;
+  }
+  .modal-btns button:hover { opacity: 0.85; }
+  .modal-btns .m-cancel { background: rgba(255,255,255,0.06); color: var(--text); }
+  .modal-btns .m-confirm { background: var(--accent); color: #fff; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #1c1c1e;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text);
+    padding: 12px 24px;
+    border-radius: 980px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 300;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  @media (max-width: 520px) {
+    .hero h1 { font-size: 32px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .glass-card { padding: 24px; }
+    .page { padding: 48px 16px 100px; }
+    .input-wrap button { padding: 18px 20px; }
+  }
+</style>
 </head>
 <body>
+<div class="page">
 
-  <header>
-    <div class="logo">InboxPirates</div>
-    <h1>Email Verifier</h1>
-    <p>Is this even a real email? Find out in seconds.</p>
-  </header>
+  <div class="hero">
+    <div class="hero-eyebrow">InboxPirates</div>
+    <h1>Is this even<br>a real email?</h1>
+    <p>Verify any email instantly. Drop a list for bulk. No sign-up required.</p>
+  </div>
 
-  <!-- Single email verify -->
-  <div class="single-verify">
-    <div class="input-row">
-      <input type="email" id="single-email" placeholder="test@example.com" autocomplete="off" />
-      <button id="single-btn">Check</button>
+  <!-- Single check -->
+  <div class="single-check">
+    <div class="input-wrap">
+      <input type="email" id="single-email" placeholder="someone@example.com" autocomplete="off" spellcheck="false">
+      <button id="single-btn">Verify</button>
     </div>
     <div class="single-result" id="single-result"></div>
   </div>
 
-  <div class="divider">or bulk verify</div>
+  <div class="section-divider"><span>Bulk verify</span></div>
 
-  <!-- Main card -->
-  <div class="card">
-    <!-- Drop zone -->
-    <div id="drop-zone">
-      <span class="icon">📬</span>
-      <h2>Drop your email list here</h2>
-      <p>Supports .csv or .txt — one email per line or CSV with columns</p>
-      <button id="browse-btn" onclick="document.getElementById('file-input').click()">Browse file</button>
-      <input type="file" id="file-input" accept=".csv,.txt" />
+  <!-- Bulk card -->
+  <div class="glass-card">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">&#9993;</div>
+      <h2>Drop your email list</h2>
+      <p>.csv or .txt — up to 10,000 emails</p>
+      <button class="browse-btn" onclick="document.getElementById('file-input').click()">Choose file</button>
+      <input type="file" id="file-input" accept=".csv,.txt">
     </div>
 
-    <!-- Preview + submit (hidden until file loaded) -->
     <div id="preview-section">
-      <div class="preview-meta">
-        <span class="file-icon">📄</span>
-        <div class="file-info">
-          <div class="fname" id="preview-fname"></div>
-          <div class="fcount" id="preview-fcount"></div>
+      <div class="file-row">
+        <div class="f-icon">&#128196;</div>
+        <div class="f-info">
+          <div class="f-name" id="preview-fname"></div>
+          <div class="f-count" id="preview-fcount"></div>
         </div>
-        <button class="clear-btn" id="clear-btn" title="Remove file">✕</button>
+        <button class="f-clear" id="clear-btn">&times;</button>
       </div>
       <div class="slider-row">
-        <label>Concurrency</label>
-        <input type="range" id="concurrency-slider" min="1" max="10" value="5" />
+        <label>Speed</label>
+        <input type="range" id="concurrency-slider" min="1" max="10" value="5">
         <span class="val" id="concurrency-val">5</span>
       </div>
-      <button id="submit-btn">Verify Emails →</button>
+      <button class="primary-btn" id="submit-btn">Verify emails</button>
     </div>
 
-    <!-- Progress (hidden until job starts) -->
     <div id="progress-section">
-      <div class="progress-label">
-        <span>Verifying...</span>
-        <span id="progress-pct">0%</span>
+      <div class="progress-header">
+        <span>Verifying</span>
+        <span class="pct" id="progress-pct">0%</span>
       </div>
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill" id="progress-fill"></div>
+      <div class="track">
+        <div class="fill" id="progress-fill"></div>
       </div>
-      <div class="progress-status" id="progress-status">Starting job…</div>
+      <div class="progress-sub" id="progress-status">Starting...</div>
     </div>
 
-    <!-- Results (hidden until done) -->
     <div id="results-section">
-      <div class="results-header">
+      <div class="results-bar">
         <h3>Results</h3>
-        <button id="download-btn">⬇ Download Results</button>
+        <button class="dl-btn" id="download-btn">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 2v9m0 0l-3-3m3 3l3-3M3 13h10"/></svg>
+          Export CSV
+        </button>
       </div>
-      <div class="stats-row">
-        <div class="stat-box safe"><div class="num" id="stat-safe">0</div><div class="lbl">Safe</div></div>
-        <div class="stat-box risky"><div class="num" id="stat-risky">0</div><div class="lbl">Risky</div></div>
-        <div class="stat-box invalid"><div class="num" id="stat-invalid">0</div><div class="lbl">Invalid</div></div>
-        <div class="stat-box unknown"><div class="num" id="stat-unknown">0</div><div class="lbl">Unknown</div></div>
+      <div class="stats">
+        <div class="stat s"><div class="n" id="stat-safe">0</div><div class="l">Safe</div></div>
+        <div class="stat r"><div class="n" id="stat-risky">0</div><div class="l">Risky</div></div>
+        <div class="stat i"><div class="n" id="stat-invalid">0</div><div class="l">Invalid</div></div>
+        <div class="stat u"><div class="n" id="stat-unknown">0</div><div class="l">Unknown</div></div>
       </div>
-      <div class="results-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Is Reachable</th>
-            </tr>
-          </thead>
-          <tbody id="results-tbody"></tbody>
-        </table>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Email</th><th>Status</th><th>Detail</th></tr></thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
       </div>
+      <button class="new-job-btn" id="new-job-btn">New verification</button>
     </div>
   </div>
 
-  <!-- Job history -->
   <div id="history-section">
-    <h3>Past Jobs</h3>
-    <div class="history-list" id="history-list"></div>
+    <div class="history-title">Recent</div>
+    <div class="h-list" id="history-list"></div>
   </div>
+</div>
 
-  <!-- Column confirm modal -->
-  <div id="column-modal">
-    <div class="modal-box">
-      <h3>Confirm email column</h3>
-      <p>We detected these columns in your CSV. Pick the one that contains email addresses.</p>
-      <select id="column-select"></select>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="confirmColumn()">Confirm</button>
-      </div>
+<!-- Column modal -->
+<div class="modal-overlay" id="column-modal">
+  <div class="modal">
+    <h3>Which column has emails?</h3>
+    <p>We found multiple columns. Pick the one with email addresses.</p>
+    <select id="column-select"></select>
+    <div class="modal-btns">
+      <button class="m-cancel" onclick="closeModal()">Cancel</button>
+      <button class="m-confirm" onclick="confirmColumn()">Confirm</button>
     </div>
   </div>
+</div>
 
-  <!-- Toast -->
-  <div id="toast"></div>
+<div id="toast"></div>
 
 <script>
-  // ── State ──────────────────────────────────────────────────────────────────
-  let parsedEmails = [];
-  let currentFileName = '';
-  let columnHeaders = [];
-  let selectedColumn = null;
-  let rawRows = [];
-  let currentJobId = null;
-  let pollTimer = null;
-  let currentResults = [];
+// ── State ──
+let parsedEmails = [];
+let currentFileName = '';
+let columnHeaders = [];
+let selectedColumn = null;
+let rawRows = [];
+let currentResults = [];
+let abortBulk = false;
 
-  const STORAGE_KEY = 'ip_verifier_jobs';
+const STORAGE_KEY = 'ip_verifier_jobs';
 
-  // ── DOM refs ───────────────────────────────────────────────────────────────
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-  const previewSection = document.getElementById('preview-section');
-  const progressSection = document.getElementById('progress-section');
-  const resultsSection = document.getElementById('results-section');
-  const progressFill = document.getElementById('progress-fill');
-  const progressPct = document.getElementById('progress-pct');
-  const progressStatus = document.getElementById('progress-status');
-  const concurrencySlider = document.getElementById('concurrency-slider');
-  const concurrencyVal = document.getElementById('concurrency-val');
+// ── DOM ──
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const previewSection = document.getElementById('preview-section');
+const progressSection = document.getElementById('progress-section');
+const resultsSection = document.getElementById('results-section');
+const progressFill = document.getElementById('progress-fill');
+const progressPct = document.getElementById('progress-pct');
+const progressStatus = document.getElementById('progress-status');
+const slider = document.getElementById('concurrency-slider');
+const sliderVal = document.getElementById('concurrency-val');
 
-  // ── Drag & drop ────────────────────────────────────────────────────────────
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
-  });
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+// ── Single verify ──
+const singleBtn = document.getElementById('single-btn');
+const singleInput = document.getElementById('single-email');
+const singleResult = document.getElementById('single-result');
 
-  document.getElementById('clear-btn').addEventListener('click', resetUpload);
-
-  concurrencySlider.addEventListener('input', () => {
-    concurrencyVal.textContent = concurrencySlider.value;
-  });
-
-  // ── File handling ──────────────────────────────────────────────────────────
-  function handleFile(file) {
-    currentFileName = file.name;
-    const ext = file.name.split('.').pop().toLowerCase();
-    const reader = new FileReader();
-    reader.onload = e => {
-      const text = e.target.result;
-      if (ext === 'csv') {
-        parseCSV(text);
-      } else {
-        // plain text — one email per line
-        const emails = text.split('\n')
-          .map(l => l.trim())
-          .filter(l => l.includes('@'));
-        setEmails(emails);
-      }
-    };
-    reader.readAsText(file);
+singleBtn.addEventListener('click', async () => {
+  const email = singleInput.value.trim();
+  if (!email || !email.includes('@')) return showToast('Enter a valid email');
+  singleBtn.disabled = true;
+  singleBtn.textContent = 'Checking...';
+  singleResult.style.display = 'none';
+  try {
+    const res = await fetch('/v0/check_email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to_email: email })
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const d = await res.json();
+    const s = (d.is_reachable || 'unknown').toLowerCase();
+    const colors = { safe: 'var(--safe)', risky: 'var(--risky)', invalid: 'var(--invalid)', unknown: 'var(--unknown)' };
+    singleResult.innerHTML = `<div class="result-card">
+      <div class="result-dot" style="background:${colors[s] || colors.unknown};box-shadow:0 0 8px ${colors[s] || colors.unknown}"></div>
+      <div class="result-email">${escHtml(email)}</div>
+      <div class="result-status" style="color:${colors[s] || colors.unknown}">${s}</div>
+    </div>`;
+    singleResult.style.display = 'block';
+  } catch (err) {
+    showToast('Failed: ' + err.message);
+  } finally {
+    singleBtn.disabled = false;
+    singleBtn.textContent = 'Verify';
   }
+});
+singleInput.addEventListener('keydown', e => { if (e.key === 'Enter') singleBtn.click(); });
 
-  function parseCSV(text) {
-    const lines = text.trim().split('\n');
-    if (!lines.length) return showToast('Empty file');
+// ── Drag & drop ──
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+document.getElementById('clear-btn').addEventListener('click', resetUpload);
+document.getElementById('new-job-btn').addEventListener('click', resetUpload);
+slider.addEventListener('input', () => { sliderVal.textContent = slider.value; });
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const firstRowCells = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-
-    // Detect if first row is a header or data (if any cell looks like an email, it's data)
-    const firstRowHasEmail = firstRowCells.some(c => emailRegex.test(c));
-    const hasHeader = !firstRowHasEmail;
-    const headers = hasHeader ? firstRowCells : firstRowCells.map((_, i) => `Column ${i + 1}`);
-    const dataStart = hasHeader ? 1 : 0;
-
-    rawRows = lines.slice(dataStart).map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
-
-    // Auto-detect email column by header name or by sampling data
-    let emailIdx = hasHeader ? headers.findIndex(h => /email|e-?mail|address/i.test(h)) : -1;
-
-    if (emailIdx === -1) {
-      // Sample data rows to find which column has emails
-      const scores = headers.map((_, i) => {
-        const sample = rawRows.slice(0, 6);
-        return sample.filter(r => r[i] && emailRegex.test(r[i])).length;
-      });
-      const best = Math.max(...scores);
-      if (best > 0) emailIdx = scores.indexOf(best);
-    }
-
-    if (emailIdx !== -1) {
-      columnHeaders = headers;
-      openModal(headers, emailIdx);
-    } else if (headers.length === 1) {
-      const emails = rawRows.map(r => r[0]).filter(v => v && v.includes('@'));
+// ── File handling ──
+function handleFile(file) {
+  currentFileName = file.name;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    if (ext === 'csv') parseCSV(text);
+    else {
+      const emails = text.split('\n').map(l => l.trim()).filter(l => l.includes('@'));
       setEmails(emails);
-    } else {
-      columnHeaders = headers;
-      openModal(headers, 0);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (!lines.length) return showToast('Empty file');
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const firstCells = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const firstRowHasEmail = firstCells.some(c => emailRegex.test(c));
+  const hasHeader = !firstRowHasEmail;
+  const headers = hasHeader ? firstCells : firstCells.map((_, i) => 'Column ' + (i + 1));
+  const dataStart = hasHeader ? 1 : 0;
+  rawRows = lines.slice(dataStart).map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+
+  let emailIdx = hasHeader ? headers.findIndex(h => /email|e-?mail|address/i.test(h)) : -1;
+  if (emailIdx === -1) {
+    const scores = headers.map((_, i) => {
+      return rawRows.slice(0, 6).filter(r => r[i] && emailRegex.test(r[i])).length;
+    });
+    const best = Math.max(...scores);
+    if (best > 0) emailIdx = scores.indexOf(best);
+  }
+
+  if (emailIdx !== -1) {
+    columnHeaders = headers;
+    openModal(headers, emailIdx);
+  } else if (headers.length === 1) {
+    setEmails(rawRows.map(r => r[0]).filter(v => v && v.includes('@')));
+  } else {
+    columnHeaders = headers;
+    openModal(headers, 0);
+  }
+}
+
+function openModal(headers, defaultIdx) {
+  const sel = document.getElementById('column-select');
+  sel.innerHTML = '';
+  headers.forEach((h, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = h;
+    if (i === defaultIdx) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('column-modal').classList.add('open');
+}
+window.closeModal = function() {
+  document.getElementById('column-modal').classList.remove('open');
+  resetUpload();
+};
+window.confirmColumn = function() {
+  const idx = parseInt(document.getElementById('column-select').value);
+  document.getElementById('column-modal').classList.remove('open');
+  setEmails(rawRows.map(r => r[idx]).filter(v => v && v.includes('@')));
+};
+
+function setEmails(emails) {
+  parsedEmails = emails;
+  document.getElementById('preview-fname').textContent = currentFileName;
+  document.getElementById('preview-fcount').textContent = emails.length.toLocaleString() + ' emails';
+  dropZone.style.display = 'none';
+  previewSection.style.display = 'block';
+}
+
+function resetUpload() {
+  parsedEmails = [];
+  rawRows = [];
+  columnHeaders = [];
+  fileInput.value = '';
+  dropZone.style.display = '';
+  previewSection.style.display = 'none';
+  progressSection.style.display = 'none';
+  resultsSection.style.display = 'none';
+  abortBulk = true;
+}
+
+// ── Bulk verify ──
+document.getElementById('submit-btn').addEventListener('click', async () => {
+  if (!parsedEmails.length) return showToast('No emails to verify');
+  if (parsedEmails.length > 10000) return showToast('Max 10,000 per job');
+  const concurrency = parseInt(slider.value);
+  abortBulk = false;
+  previewSection.style.display = 'none';
+  progressSection.style.display = 'block';
+  const total = parsedEmails.length;
+  const results = [];
+  let done = 0;
+  setProgress(0, '0 / ' + total);
+  const queue = [...parsedEmails];
+
+  async function worker() {
+    while (queue.length && !abortBulk) {
+      const email = queue.shift();
+      try {
+        const res = await fetch('/v0/check_email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to_email: email })
+        });
+        if (res.ok) results.push(await res.json());
+        else results.push({ input: email, is_reachable: 'unknown' });
+      } catch { results.push({ input: email, is_reachable: 'unknown' }); }
+      done++;
+      setProgress(Math.round((done / total) * 100), done + ' / ' + total);
     }
   }
 
-  function openModal(headers, defaultIdx) {
-    const sel = document.getElementById('column-select');
-    sel.innerHTML = '';
-    headers.forEach((h, i) => {
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = h;
-      if (i === defaultIdx) opt.selected = true;
-      sel.appendChild(opt);
-    });
-    document.getElementById('column-modal').classList.add('open');
-  }
-
-  window.closeModal = function() {
-    document.getElementById('column-modal').classList.remove('open');
+  try {
+    await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
+    if (!abortBulk) {
+      setProgress(100, 'Complete');
+      setTimeout(() => showResults(results, 'local-' + Date.now()), 400);
+    }
+  } catch (err) {
+    showToast('Failed: ' + err.message);
     resetUpload();
-  };
-
-  window.confirmColumn = function() {
-    const idx = parseInt(document.getElementById('column-select').value);
-    document.getElementById('column-modal').classList.remove('open');
-    const emails = rawRows.map(r => r[idx]).filter(v => v && v.includes('@'));
-    setEmails(emails);
-  };
-
-  function setEmails(emails) {
-    parsedEmails = emails;
-    document.getElementById('preview-fname').textContent = currentFileName;
-    document.getElementById('preview-fcount').textContent = `${emails.length.toLocaleString()} emails detected`;
-    dropZone.style.display = 'none';
-    previewSection.style.display = 'block';
   }
+});
 
-  function resetUpload() {
-    parsedEmails = [];
-    rawRows = [];
-    columnHeaders = [];
-    fileInput.value = '';
-    dropZone.style.display = '';
-    previewSection.style.display = 'none';
-    progressSection.style.display = 'none';
-    resultsSection.style.display = 'none';
-    abortBulk = true;
-  }
+function setProgress(pct, status) {
+  progressFill.style.width = pct + '%';
+  progressPct.textContent = pct + '%';
+  progressStatus.textContent = status;
+}
 
-  // ── Submit job (uses /v0/check_email with concurrency pool) ──────────────
-  let abortBulk = false;
+// ── Results ──
+function showResults(results, jobId) {
+  currentResults = results;
+  const counts = { safe: 0, risky: 0, invalid: 0, unknown: 0 };
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = '';
 
-  document.getElementById('submit-btn').addEventListener('click', async () => {
-    if (!parsedEmails.length) return showToast('No emails to verify');
-    if (parsedEmails.length > 10000) return showToast('Max 10,000 emails per job');
-
-    const concurrency = parseInt(concurrencySlider.value);
-    abortBulk = false;
-
-    previewSection.style.display = 'none';
-    progressSection.style.display = 'block';
-
-    const total = parsedEmails.length;
-    const results = [];
-    let done = 0;
-
-    setProgress(0, `0 / ${total} verified…`);
-
-    // Concurrency pool — run N checks at a time
-    const queue = [...parsedEmails];
-
-    async function worker() {
-      while (queue.length && !abortBulk) {
-        const email = queue.shift();
-        try {
-          const res = await fetch('/v0/check_email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to_email: email })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            results.push(data);
-          } else {
-            results.push({ input: email, is_reachable: 'unknown' });
-          }
-        } catch {
-          results.push({ input: email, is_reachable: 'unknown' });
-        }
-        done++;
-        const pct = Math.round((done / total) * 100);
-        setProgress(pct, `${done} / ${total} verified…`);
-      }
-    }
-
-    try {
-      const workers = Array.from({ length: Math.min(concurrency, total) }, () => worker());
-      await Promise.all(workers);
-
-      if (!abortBulk) {
-        setProgress(100, 'Done!');
-        const jobId = 'local-' + Date.now();
-        setTimeout(() => showResults(results, jobId), 400);
-      }
-    } catch (err) {
-      showToast('Bulk verify failed: ' + err.message);
-      resetUpload();
-    }
+  results.forEach(r => {
+    const st = classify(r);
+    counts[st]++;
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + escHtml(r.input || '') + '</td><td><span class="pill ' + st + '">' + st + '</span></td><td style="color:var(--text-tertiary);font-size:12px">' + escHtml(getInfo(r)) + '</td>';
+    tbody.appendChild(tr);
   });
 
-  function setProgress(pct, status) {
-    progressFill.style.width = pct + '%';
-    progressPct.textContent = pct + '%';
-    progressStatus.textContent = status;
-  }
+  document.getElementById('stat-safe').textContent = counts.safe;
+  document.getElementById('stat-risky').textContent = counts.risky;
+  document.getElementById('stat-invalid').textContent = counts.invalid;
+  document.getElementById('stat-unknown').textContent = counts.unknown;
 
-  // ── Results ────────────────────────────────────────────────────────────────
-  function showResults(results, jobId) {
-    currentResults = results;
+  progressSection.style.display = 'none';
+  resultsSection.style.display = 'block';
 
-    const counts = { safe: 0, risky: 0, invalid: 0, unknown: 0 };
-    const tbody = document.getElementById('results-tbody');
-    tbody.innerHTML = '';
-
-    results.forEach(r => {
-      const status = classifyResult(r);
-      counts[status] = (counts[status] || 0) + 1;
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${escHtml(r.input || '')}</td>
-        <td><span class="badge ${status}">${status}</span></td>
-        <td>${escHtml(String(r.is_reachable || 'unknown'))}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('stat-safe').textContent = counts.safe;
-    document.getElementById('stat-risky').textContent = counts.risky;
-    document.getElementById('stat-invalid').textContent = counts.invalid;
-    document.getElementById('stat-unknown').textContent = counts.unknown;
-
-    progressSection.style.display = 'none';
-    resultsSection.style.display = 'block';
-
-    // Save to history
-    saveJob({
-      id: jobId,
-      fileName: currentFileName,
-      date: new Date().toISOString(),
-      total: results.length,
-      safe: counts.safe,
-      results
-    });
-    renderHistory();
-  }
-
-  function classifyResult(r) {
-    const ir = (r.is_reachable || '').toLowerCase();
-    if (ir === 'safe') return 'safe';
-    if (ir === 'risky') return 'risky';
-    if (ir === 'invalid') return 'invalid';
-    return 'unknown';
-  }
-
-  document.getElementById('download-btn').addEventListener('click', () => {
-    if (!currentResults.length) return showToast('No results to download');
-    const rows = currentResults.map(r => {
-      const email = (r.input || '').replace(/,/g, '');
-      const status = classifyResult(r);
-      return `${email},${status}`;
-    });
-    const csv = 'email,status\n' + rows.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `reacher_results_${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-
-  // ── Job History ────────────────────────────────────────────────────────────
-  function loadJobs() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
-  }
-
-  function saveJob(job) {
-    const jobs = loadJobs();
-    jobs.unshift(job);
-    const trimmed = jobs.slice(0, 50); // keep last 50
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
-  }
-
-  function renderHistory() {
-    const jobs = loadJobs();
-    const list = document.getElementById('history-list');
-    const section = document.getElementById('history-section');
-
-    if (!jobs.length) {
-      list.innerHTML = '<div class="empty-history">No past jobs yet.</div>';
-      section.style.display = 'block';
-      return;
-    }
-
-    section.style.display = 'block';
-    list.innerHTML = '';
-    jobs.forEach(job => {
-      const d = new Date(job.date);
-      const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      const item = document.createElement('div');
-      item.className = 'history-item';
-      item.innerHTML = `
-        <div class="hi-info">
-          <div class="hi-name">${escHtml(job.fileName)}</div>
-          <div class="hi-meta">${dateStr} · ${job.total.toLocaleString()} emails</div>
-        </div>
-        <span class="hi-badge">${job.safe} safe</span>
-        <button class="hi-del" data-id="${job.id}" title="Delete">✕</button>
-      `;
-      item.querySelector('.hi-del').addEventListener('click', e => {
-        e.stopPropagation();
-        deleteJob(job.id);
-      });
-      item.addEventListener('click', () => restoreJob(job));
-      list.appendChild(item);
-    });
-  }
-
-  function deleteJob(id) {
-    const jobs = loadJobs().filter(j => j.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
-    renderHistory();
-  }
-
-  function restoreJob(job) {
-    currentResults = job.results || [];
-    currentFileName = job.fileName;
-    showResults(job.results, job.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  // ── Toast ──────────────────────────────────────────────────────────────────
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
-  }
-
-  // ── Utils ──────────────────────────────────────────────────────────────────
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── Single verify ────────────────────────────────────────────────────────
-  const singleBtn = document.getElementById('single-btn');
-  const singleInput = document.getElementById('single-email');
-  const singleResult = document.getElementById('single-result');
-
-  singleBtn.addEventListener('click', async () => {
-    const email = singleInput.value.trim();
-    if (!email || !email.includes('@')) return showToast('Enter a valid email');
-    singleBtn.disabled = true;
-    singleBtn.textContent = 'Checking…';
-    singleResult.style.display = 'none';
-
-    try {
-      const res = await fetch('/v0/check_email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to_email: email })
-      });
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-      const data = await res.json();
-      const status = (data.is_reachable || 'unknown').toLowerCase();
-      const colors = { safe: 'var(--safe)', risky: 'var(--risky)', invalid: 'var(--invalid)', unknown: 'var(--unknown)' };
-      const color = colors[status] || colors.unknown;
-      singleResult.innerHTML = `<span style="color:${color};font-weight:700;text-transform:capitalize;">${status}</span> — ${escHtml(email)}`;
-      singleResult.style.display = 'block';
-    } catch (err) {
-      showToast('Check failed: ' + err.message);
-    } finally {
-      singleBtn.disabled = false;
-      singleBtn.textContent = 'Check';
-    }
-  });
-
-  singleInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') singleBtn.click();
-  });
-
-  // ── Init ───────────────────────────────────────────────────────────────────
+  saveJob({ id: jobId, fileName: currentFileName, date: new Date().toISOString(), total: results.length, safe: counts.safe, results });
   renderHistory();
+}
+
+function classify(r) {
+  const v = (r.is_reachable || '').toLowerCase();
+  if (v === 'safe') return 'safe';
+  if (v === 'risky') return 'risky';
+  if (v === 'invalid') return 'invalid';
+  return 'unknown';
+}
+
+function getInfo(r) {
+  if (!r.smtp) return '';
+  if (r.smtp.is_disabled) return 'mailbox disabled';
+  if (r.smtp.is_catch_all) return 'catch-all';
+  if (r.syntax && !r.syntax.is_valid_syntax) return 'bad syntax';
+  if (r.mx && !r.mx.accepts_mail) return 'no MX';
+  return '';
+}
+
+// ── Download ──
+document.getElementById('download-btn').addEventListener('click', () => {
+  if (!currentResults.length) return showToast('Nothing to export');
+  const rows = currentResults.map(r => escCsv(r.input || '') + ',' + classify(r) + ',' + escCsv(getInfo(r)));
+  const csv = 'email,status,info\n' + rows.join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'results_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+});
+
+// ── History ──
+function loadJobs() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } }
+
+function saveJob(job) {
+  const jobs = loadJobs();
+  jobs.unshift(job);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs.slice(0, 50)));
+}
+
+function renderHistory() {
+  const jobs = loadJobs();
+  const list = document.getElementById('history-list');
+  const section = document.getElementById('history-section');
+  if (!jobs.length) { list.innerHTML = '<div class="h-empty">No recent jobs</div>'; section.style.display = 'block'; return; }
+  section.style.display = 'block';
+  list.innerHTML = '';
+  jobs.forEach(job => {
+    const d = new Date(job.date);
+    const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const el = document.createElement('div');
+    el.className = 'h-item';
+    el.innerHTML = '<div class="h-info"><div class="h-name">' + escHtml(job.fileName) + '</div><div class="h-meta">' + ds + ' · ' + job.total.toLocaleString() + ' emails</div></div><span class="h-safe">' + job.safe + ' safe</span><button class="h-del" title="Remove">&times;</button>';
+    el.querySelector('.h-del').addEventListener('click', e => { e.stopPropagation(); deleteJob(job.id); });
+    el.addEventListener('click', () => { currentResults = job.results || []; currentFileName = job.fileName; showResults(job.results, job.id); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    list.appendChild(el);
+  });
+}
+
+function deleteJob(id) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(loadJobs().filter(j => j.id !== id)));
+  renderHistory();
+}
+
+// ── Utils ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function escCsv(s) { return s.includes(',') ? '"' + s.replace(/"/g, '""') + '"' : s; }
+
+// ── Init ──
+renderHistory();
 </script>
 </body>
 </html>
